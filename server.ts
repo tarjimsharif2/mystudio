@@ -106,97 +106,12 @@ app.get("/api/matches", async (req, res) => {
     matchesCache.data = matches;
     matchesCache.lastFetch = Date.now();
 
-    // Trigger full json update in background if needed
-    updateFullJsonCache(matches);
-
+    res.setHeader("Cache-Control", "s-maxage=120, stale-while-revalidate=59");
     res.json({ success: true, matches });
   } catch (error: any) {
     console.error("Error scraping matches:", error.message);
     res.status(500).json({ success: false, error: "Failed to scrape matches" });
   }
-});
-
-let isUpdatingJson = false;
-
-// Helper to update full json cache in the background
-async function updateFullJsonCache(matches: any[]) {
-  const now = Date.now();
-  if (isUpdatingJson || (now - fullJsonCache.lastFetch < 5 * 60 * 1000)) {
-     return; // Already updating or cache is fresh enough (5 mins)
-  }
-  
-  isUpdatingJson = true;
-  try {
-     const fullMatches = [];
-     for (const match of matches) {
-         try {
-           const streamRes = await axios.get(`http://localhost:3000/api/match-stream?url=${encodeURIComponent(match.link)}`);
-           const slug = match.title.toLowerCase()
-              .replace(/\s+/g, '-')
-              .replace(/[^\w\u0600-\u06FF\-]+/g, '')
-              .replace(/\-\-+/g, '-')
-              .replace(/^-+/, '')
-              .replace(/-+$/, '');
-              
-           const matchFull = {
-              ...match,
-              slug: slug,
-              player_page: `/watch/${slug}`,
-              servers: streamRes.data.servers || []
-           };
-           fullMatches.push(matchFull);
-         } catch (e) {
-           const slug = match.title.toLowerCase()
-              .replace(/\s+/g, '-')
-              .replace(/[^\w\u0600-\u06FF\-]+/g, '')
-              .replace(/\-\-+/g, '-')
-              .replace(/^-+/, '')
-              .replace(/-+$/, '');
-              
-           fullMatches.push({
-             ...match,
-             slug: slug,
-             player_page: `/watch/${slug}`,
-             servers: []
-           });
-         }
-     }
-     
-     fullJsonCache.data = {
-       updatedAt: new Date().toISOString(),
-       matches: fullMatches
-     };
-     fullJsonCache.lastFetch = Date.now();
-  } catch (e) {
-     console.error("Error updating full JSON cache:", e);
-  } finally {
-     isUpdatingJson = false;
-  }
-}
-
-// Global API endpoint for all matches and servers
-app.get("/api/match.json", async (req, res) => {
-   if (fullJsonCache.data) {
-      return res.json(fullJsonCache.data);
-   }
-   
-   // If not available yet, just trigger matches fetch and tell user to retry
-   if (!matchesCache.data) {
-      try {
-        await axios.get(`http://localhost:${PORT}/api/matches`);
-      } catch(e) {}
-   } else {
-      updateFullJsonCache(matchesCache.data);
-   }
-   
-   if (fullJsonCache.data) {
-       return res.json(fullJsonCache.data);
-   }
-   
-   return res.status(503).json({ 
-       status: "Processing", 
-       message: "JSON is being generated for the first time. Please refresh in a few moments." 
-   });
 });
 
 async function extractStreamFromPlayer(url: string, referer: string, depth = 0): Promise<{ streamUrl: string | null, servers: any[], referer: string }> {
@@ -408,6 +323,7 @@ app.get("/api/match-stream", async (req, res) => {
         }
       }
       
+      res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=30");
       return res.json({ success: true, ...result });
     }
 
@@ -422,6 +338,7 @@ app.get("/api/match-stream", async (req, res) => {
       }
     }
 
+    res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=30");
     res.json({ success: true, streamUrl, referer: url });
   } catch (error: any) {
     console.error("Error scraping stream:", error.message);
@@ -430,122 +347,7 @@ app.get("/api/match-stream", async (req, res) => {
 });
 
 // Proxy endpoint to bypass CORS and Referer restrictions for m3u8 streams
-app.get("/api/proxy", async (req, res) => {
-  const targetUrl = req.query.url as string;
-  const referer = req.query.referer as string || 'https://frfff.shootwithyalla.com/';
-  
-  if (!targetUrl) return res.status(400).send('URL required');
-  
-  try {
-    const headers: Record<string, string> = {
-      'Referer': referer,
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
-      'Accept': '*/*',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Connection': 'keep-alive'
-    };
 
-    try {
-      headers['Origin'] = new URL(referer).origin;
-    } catch (e) {
-      // Ignore invalid referer URL
-    }
-
-    const response = await axios({
-      method: 'get',
-      url: targetUrl,
-      responseType: 'stream',
-      headers,
-      validateStatus: () => true // Don't throw on error status codes
-    });
-    
-    if (response.status >= 400) {
-      console.error(`Proxy target returned status ${response.status} for ${targetUrl}`);
-      // Try again without Origin header if it was a 403
-      if (response.status === 403 && headers['Origin']) {
-        delete headers['Origin'];
-        const retryResponse = await axios({
-          method: 'get',
-          url: targetUrl,
-          responseType: 'stream',
-          headers,
-          validateStatus: () => true
-        });
-        
-        if (retryResponse.status < 400) {
-          // Retry succeeded
-          Object.keys(retryResponse.headers).forEach(key => {
-            if (key.toLowerCase() !== 'transfer-encoding' && key.toLowerCase() !== 'access-control-allow-origin') {
-              res.setHeader(key, retryResponse.headers[key]);
-            }
-          });
-          res.setHeader('Access-Control-Allow-Origin', '*');
-          
-          if (targetUrl.includes('.m3u8')) {
-            let body = '';
-            retryResponse.data.on('data', (chunk: any) => { body += chunk.toString(); });
-            retryResponse.data.on('end', () => {
-              const baseUrl = new URL(targetUrl);
-              const rewritten = body.split('\n').map(line => {
-                if (line.startsWith('#') || line.trim() === '') return line;
-                let absoluteUrl = line;
-                if (!line.startsWith('http')) {
-                  absoluteUrl = new URL(line, baseUrl.href).href;
-                }
-                return `/api/proxy?url=${encodeURIComponent(absoluteUrl)}&referer=${encodeURIComponent(referer)}`;
-              }).join('\n');
-              res.status(retryResponse.status).send(rewritten);
-            });
-            return;
-          } else {
-            res.status(retryResponse.status);
-            retryResponse.data.pipe(res);
-            return;
-          }
-        }
-      }
-      
-      res.status(response.status);
-      response.data.pipe(res);
-      return;
-    }
-
-    // Copy headers
-    Object.keys(response.headers).forEach(key => {
-      if (key.toLowerCase() !== 'transfer-encoding' && key.toLowerCase() !== 'access-control-allow-origin') {
-        res.setHeader(key, response.headers[key]);
-      }
-    });
-    
-    // Add CORS headers
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    
-    // If it's an m3u8 file, we need to rewrite the URLs inside it
-    if (targetUrl.includes('.m3u8')) {
-      let body = '';
-      response.data.on('data', (chunk: any) => { body += chunk.toString(); });
-      response.data.on('end', () => {
-        const baseUrl = new URL(targetUrl);
-        const rewritten = body.split('\n').map(line => {
-          if (line.startsWith('#') || line.trim() === '') return line;
-          // It's a URL
-          let absoluteUrl = line;
-          if (!line.startsWith('http')) {
-            absoluteUrl = new URL(line, baseUrl.href).href;
-          }
-          return `/api/proxy?url=${encodeURIComponent(absoluteUrl)}&referer=${encodeURIComponent(referer)}`;
-        }).join('\n');
-        res.send(rewritten);
-      });
-    } else {
-      // For .ts files, just pipe the stream
-      response.data.pipe(res);
-    }
-  } catch (e: any) {
-    console.error("Proxy error:", e.message);
-    res.status(e.response?.status || 500).send(e.message);
-  }
-});
 
 async function startServer() {
 // Vite middleware for development
@@ -563,9 +365,13 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  if (!process.env.VERCEL) {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
 }
 
 startServer();
+
+export default app;
