@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Player Professional</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@clappr/player@0.11.5/dist/clappr.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/clappr/clappr-level-selector-plugin@latest/dist/level-selector.min.js"></script>
+
+    <style>
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            background-color: #000; display: flex; justify-content: center; 
+            align-items: center; overflow: hidden; font-family: sans-serif;
+        }
+
+        #player-wrapper { position: relative; width: 100vw; height: 100vh; }
+        #player { width: 100% !important; height: 100% !important; }
+
+        /* Embed Icon - Dark Red Color */
+        .embed-icon {
+            position: absolute; top: 20px; left: 20px; z-index: 999;
+            cursor: pointer; background: rgba(139, 0, 0, 0.9); padding: 10px;
+            border-radius: 50%; display: flex; align-items: center;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            transition: transform 0.2s;
+        }
+        .embed-icon:hover { transform: scale(1.1); background: #a00000; }
+        .embed-icon svg { fill: white; width: 22px; height: 22px; }
+
+        /* Modal Background */
+        #embedModal {
+            display: none; position: fixed; z-index: 1000;
+            left: 0; top: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.85); align-items: center; justify-content: center;
+        }
+
+        /* Modal Content */
+        .modal-content {
+            background-color: #1a1a1a; padding: 25px; border-radius: 12px;
+            width: 90%; max-width: 550px; text-align: center; color: white;
+            border: 1px solid #333;
+        }
+
+        .modal-content textarea {
+            width: 100%; height: 120px; margin: 15px 0; background: #000;
+            color: #ccc; border: 1px solid #444; padding: 12px;
+            box-sizing: border-box; resize: none; font-family: monospace;
+            font-size: 13px; border-radius: 5px;
+        }
+
+        .modal-content button {
+            background: #8b0000; color: white; border: none;
+            padding: 12px 30px; cursor: pointer; border-radius: 5px; 
+            font-weight: bold; transition: background 0.3s;
+        }
+        .modal-content button:hover { background: #a00000; }
+
+        .close-modal {
+            float: right; cursor: pointer; font-size: 24px; color: #777;
+            line-height: 20px;
+        }
+        .close-modal:hover { color: #fff; }
+    </style>
+</head>
+<body>
+
+    <div id="player-wrapper">
+        <div class="embed-icon" onclick="openModal()">
+            <svg viewBox="0 0 24 24"><path d="M14.6 16.6l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4zM9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4z"/></svg>
+        </div>
+        <div id="player"></div>
+    </div>
+
+    <div id="embedModal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeModal()">&times;</span>
+            <h3 style="margin: 0 0 10px 0;">Embed Code</h3>
+            <p style="font-size: 13px; color: #888;">Copy the code below to embed this player:</p>
+            <textarea id="embedCodeText" readonly></textarea>
+            <br>
+            <button onclick="copyAndClose()">Copy Code</button>
+        </div>
+    </div>
+
+    <script>
+        // Player Config
+        var masterPlaylist = 
+            "#EXTM3U\n" +
+            "#EXT-X-STREAM-INF:BANDWIDTH=2500000,RESOLUTION=1280x720,NAME=720p\n" +
+            "https://s3.eu-north-1.amazonaws.com/196.c111/hls/0/stream.m3u8\n" +
+            "#EXT-X-STREAM-INF:BANDWIDTH=800000,RESOLUTION=854x480,NAME=480p\n" +
+            "https://s3.eu-north-1.amazonaws.com/46.c111/hls/1/stream.m3u8";
+
+        var blob = new Blob([masterPlaylist], { type: 'application/x-mpegURL' });
+        var masterUrl = URL.createObjectURL(blob);
+
+        var player = new Clappr.Player({
+            source: masterUrl,
+            parentId: "#player",
+            plugins: [LevelSelector],
+            width: '100%', height: '100%',
+            autoPlay: true,
+            mimeType: "application/x-mpegURL",
+            levelSelectorConfig: {
+                title: 'Quality',
+                labels: { 1: '720p HD', 0: '480p SD' },
+                labelDefault: 'Auto'
+            },
+            playback: {
+                playInline: true,
+                hlsjsConfig: {
+                    startLevel: -1,
+                    abrEwmaDefaultEstimate: 5000000,
+                    capLevelToPlayerSize: true,
+                    enableWorker: true,
+                    backBufferLength: 30 
+                }
+            }
+        });
+
+        window.onresize = function() { player.resize({width: '100%', height: '100%'}); };
+
+        // Modal & Embed Logic
+        function openModal() {
+            var currentUrl = window.location.href;
+            // Updated iframe format based on your request
+            var embedTemplate = '<iframe allow="autoplay; encrypted-media" allowfullscreen="true" class="" height="620px" id="streamFrame" frameborder="0" src="' + currentUrl + '" width="100%"></iframe>';
+            
+            document.getElementById('embedCodeText').value = embedTemplate;
+            document.getElementById('embedModal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('embedModal').style.display = 'none';
+        }
+
+        function copyAndClose() {
+            var copyText = document.getElementById("embedCodeText");
+            copyText.select();
+            copyText.setSelectionRange(0, 99999);
+            navigator.clipboard.writeText(copyText.value);
+            alert("Embed code copied successfully!");
+            closeModal();
+        }
+    </script>
+
+    <script>(function(s,u,z,p){s.src=u,s.setAttribute('data-zone',z),p.appendChild(s);})(document.createElement('script'),'https://arvigorothan.com/tag.min.js',7714242,document.body||document.documentElement)</script>
+    <script type="text/javascript">
+        var _Hasync= _Hasync|| [];
+        _Hasync.push(['Histats.start', '1,4967593,4,0,0,0,00010000']);
+        _Hasync.push(['Histats.fasi', '1']);
+        _Hasync.push(['Histats.track_hits', '']);
+        (function() {
+            var hs = document.createElement('script'); hs.type = 'text/javascript'; hs.async = true;
+            hs.src = ('//s10.histats.com/js15_as.js');
+            (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(hs);
+        })();
+    </script>
+    <noscript><a href="/" target="_blank"><img src="//sstatic1.histats.com/0.gif?4967593&101" alt="stats" border="0"></a></noscript>
+
+</body>
+</html>

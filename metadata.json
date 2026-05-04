@@ -1,0 +1,5 @@
+{
+  "name": "Remix: okkoora",
+  "description": "Scrapes and plays live football matches from okkoora.com",
+  "requestFramePermissions": []
+}
