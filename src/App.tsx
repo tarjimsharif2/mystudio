@@ -550,6 +550,10 @@ function MainApp() {
     setError(null);
     try {
       const res = await fetch("/api/matches");
+      if (!res.ok) {
+         let errorText = await res.text();
+         throw new Error(`Server returned ${res.status}: ${errorText}`);
+      }
       const data = await res.json();
       if (data.success) {
         setMatches(data.matches);

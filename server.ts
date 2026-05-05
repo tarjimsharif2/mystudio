@@ -2,7 +2,6 @@ import express from "express";
 import cors from "cors";
 import axios from "axios";
 import * as cheerio from "cheerio";
-import { createServer as createViteServer } from "vite";
 import path from "path";
 import translate from "google-translate-api-x";
 
@@ -26,6 +25,7 @@ app.get("/api/matches", async (req, res) => {
 
   try {
     const response = await axios.get("https://www.okkoora.com", {
+      timeout: 4000,
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
         "Accept-Language": "en-US,en;q=0.9,ar;q=0.8",
@@ -83,7 +83,15 @@ app.get("/api/matches", async (req, res) => {
     // Translate all Arabic texts at once
     if (textsToTranslate.length > 0) {
       try {
-        const translatedArray = await translate(textsToTranslate, { to: 'en' });
+        let timeoutId: any;
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error("Translation timed out")), 4000);
+        });
+        const translatedArray: any = await Promise.race([
+          translate(textsToTranslate, { to: 'en' }),
+          timeoutPromise
+        ]);
+        clearTimeout(timeoutId);
         let tIndex = 0;
         
         for (let m of matches) {
@@ -106,8 +114,10 @@ app.get("/api/matches", async (req, res) => {
     matchesCache.data = matches;
     matchesCache.lastFetch = Date.now();
 
-    // Trigger full json update in background if needed
-    updateFullJsonCache(matches);
+    // Trigger full json update in background if needed (does not work well in serverless Vercel)
+    if (!process.env.VERCEL) {
+        updateFullJsonCache(matches).catch(console.error);
+    }
 
     res.json({ success: true, matches });
   } catch (error: any) {
@@ -183,10 +193,16 @@ app.get("/api/match.json", async (req, res) => {
    // If not available yet, just trigger matches fetch and tell user to retry
    if (!matchesCache.data) {
       try {
-        await axios.get(`http://localhost:${PORT}/api/matches`);
+        if (!process.env.VERCEL) {
+          await axios.get(`http://localhost:${PORT}/api/matches`);
+        } else {
+          // Just let it return 503 processing
+        }
       } catch(e) {}
    } else {
-      updateFullJsonCache(matchesCache.data);
+      if (!process.env.VERCEL) {
+         updateFullJsonCache(matchesCache.data).catch(console.error);
+      }
    }
    
    if (fullJsonCache.data) {
@@ -550,11 +566,16 @@ app.get("/api/proxy", async (req, res) => {
 async function startServer() {
 // Vite middleware for development
   if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
+    try {
+      const { createServer: createViteServer } = await import("vite");
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } catch (e) {
+      console.warn("Vite not available");
+    }
   } else if (!process.env.VERCEL) {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
