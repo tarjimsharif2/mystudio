@@ -38,6 +38,16 @@ const generateSlug = (text: string) => {
     .replace(/-+$/, '');
 };
 
+const getMatchSlug = (match: Match) => {
+  if (match.team1 && match.team2) {
+    return generateSlug(`${match.team1} vs ${match.team2}`);
+  }
+  let cleanTitle = match.title.toLowerCase();
+  cleanTitle = cleanTitle.replace(/match broadcast.*$/i, '');
+  cleanTitle = cleanTitle.replace(/live broadcast.*$/i, '');
+  return generateSlug(cleanTitle);
+};
+
 function MatchList({ matches, loading, error, fetchMatches }: { matches: Match[], loading: boolean, error: string | null, fetchMatches: () => void }) {
   const navigate = useNavigate();
 
@@ -81,7 +91,7 @@ function MatchList({ matches, loading, error, fetchMatches }: { matches: Match[]
               {categoryMatches.map((match) => (
                 <Link
                   key={match.id}
-                  to={`/match/${generateSlug(match.title)}`}
+                  to={`/match/${getMatchSlug(match)}`}
                   className="block bg-gray-800 border border-gray-700 hover:border-blue-500 p-4 rounded-lg cursor-pointer transition-all group relative overflow-hidden"
                 >
                   {match.status && match.status.includes('جارية') && (
@@ -145,7 +155,7 @@ function MatchDetails({ matches, loading }: { matches: Match[], loading: boolean
   const [fetchingServers, setFetchingServers] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const selectedMatch = matches.find(m => generateSlug(m.title) === slug);
+  const selectedMatch = matches.find(m => getMatchSlug(m) === slug);
 
   useEffect(() => {
     if (!selectedMatch) return;
@@ -285,7 +295,7 @@ function WatchMatch({ matches, loading }: { matches: Match[], loading: boolean }
   const [selectedServer, setSelectedServer] = useState<ServerOption | null>(null);
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
 
-  const selectedMatch = matches.find(m => generateSlug(m.title) === slug);
+  const selectedMatch = matches.find(m => getMatchSlug(m) === slug);
 
   useEffect(() => {
     if (!selectedMatch) return;
@@ -437,7 +447,7 @@ function MatchPlayer({ matches, loading }: { matches: Match[], loading: boolean 
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [status, setStatus] = useState<'loading' | 'waiting' | 'playing'>('loading');
 
-  const selectedMatch = matches.find(m => generateSlug(m.title) === slug);
+  const selectedMatch = matches.find(m => getMatchSlug(m) === slug);
 
   useEffect(() => {
     if (!selectedMatch || !serverSlug) return;

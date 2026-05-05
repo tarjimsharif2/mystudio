@@ -6,7 +6,7 @@ import translate from 'google-translate-api-x';
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const response = await axios.get("https://www.okkoora.com", {
-      timeout: 3500,
+      timeout: 8000,
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)",
         "Accept-Language": "en-US,en;q=0.9,ar;q=0.8",
@@ -65,7 +65,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       try {
         let timeoutId: any;
         const timeoutPromise = new Promise((_, reject) => {
-          timeoutId = setTimeout(() => reject(new Error("Translation timed out")), 2500);
+          timeoutId = setTimeout(() => reject(new Error("Translation timed out")), 4000);
         });
         const translateTask = translate(textsToTranslate, { to: 'en' }).catch(e => {
            console.error("Background translate error:", e.message);

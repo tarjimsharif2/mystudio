@@ -7,7 +7,7 @@ async function extractStreamFromPlayer(url: string, referer: string, depth = 0):
   
   try {
     const playerRes = await axios.get(url, {
-      timeout: 3500,
+      timeout: 8000,
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)",
         "Referer": referer,
@@ -137,7 +137,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       streamUrl = url;
     } else {
       const response = await axios.get(url, {
-        timeout: 3500,
+        timeout: 8000,
         headers: mainPageHeaders,
       });
 
