@@ -151,7 +151,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                    image: m.logo1 || m.logo2 || "https://icons.iconarchive.com/icons/custom-icon-design/flatastic-10/512/Sport-football-icon.png",
                    matchUrl: m.link,
                    playerUrl: `${baseUrl}/match/${slug}/${serverSlug}`,
-                   streamUrl: `https://pvupixvgqwqaoauyidur.supabase.co/functions/v1/proxy?url=` 
+                   streamUrl: `${baseUrl}/api/proxy?url=` 
                };
            });
         }
@@ -165,7 +165,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
            image: m.logo1 || m.logo2 || "https://icons.iconarchive.com/icons/custom-icon-design/flatastic-10/512/Sport-football-icon.png",
            matchUrl: m.link,
            playerUrl: `${baseUrl}/match/${slug}`,
-           streamUrl: `https://pvupixvgqwqaoauyidur.supabase.co/functions/v1/proxy?url=` 
+           streamUrl: `${baseUrl}/api/proxy?url=` 
         }];
     });
 

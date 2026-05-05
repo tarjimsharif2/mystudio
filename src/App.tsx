@@ -354,7 +354,7 @@ function WatchMatch({ matches, loading }: { matches: Match[], loading: boolean }
             if (finalUrl && finalUrl.includes('.m3u8')) {
               const finalReferer = sData.referer ? sData.referer : '';
               const refererParam = finalReferer ? `&referer=${encodeURIComponent(finalReferer)}` : '';
-              finalUrl = `https://pvupixvgqwqaoauyidur.supabase.co/functions/v1/proxy?url=${encodeURIComponent(finalUrl)}${refererParam}`;
+              finalUrl = `/api/proxy?url=${encodeURIComponent(finalUrl)}${refererParam}`;
             }
           }
         } else {
@@ -366,7 +366,7 @@ function WatchMatch({ matches, loading }: { matches: Match[], loading: boolean }
             if (finalUrl && finalUrl.includes('.m3u8')) {
               const finalReferer = data.referer ? data.referer : '';
               const refererParam = finalReferer ? `&referer=${encodeURIComponent(finalReferer)}` : '';
-              finalUrl = `https://pvupixvgqwqaoauyidur.supabase.co/functions/v1/proxy?url=${encodeURIComponent(finalUrl)}${refererParam}`;
+              finalUrl = `/api/proxy?url=${encodeURIComponent(finalUrl)}${refererParam}`;
             }
           }
         }
@@ -428,7 +428,7 @@ function WatchMatch({ matches, loading }: { matches: Match[], loading: boolean }
              <div className="absolute inset-0 flex flex-col items-center justify-center text-white p-4 text-center">
                <RefreshCw className="w-12 h-12 animate-spin text-blue-500" />
              </div>
-           ) : streamUrl.includes('.m3u8') || streamUrl.includes('proxy?url=') ? (
+           ) : streamUrl.includes('.m3u8') || streamUrl.includes('/api/proxy') ? (
              <ClapprProxyPlayer streamUrl={streamUrl} />
            ) : (
              <iframe
@@ -492,7 +492,7 @@ function MatchPlayer({ matches, loading }: { matches: Match[], loading: boolean 
               // Use the referer from the final response (sData) if available, otherwise fallback to data.referer
               const finalReferer = (sData && sData.referer) ? sData.referer : data.referer;
               const refererParam = finalReferer ? `&referer=${encodeURIComponent(finalReferer)}` : '';
-              finalUrl = `https://pvupixvgqwqaoauyidur.supabase.co/functions/v1/proxy?url=${encodeURIComponent(finalUrl)}${refererParam}`;
+              finalUrl = `/api/proxy?url=${encodeURIComponent(finalUrl)}${refererParam}`;
             }
             setStreamUrl(finalUrl);
             setStatus('playing');
@@ -538,7 +538,7 @@ function MatchPlayer({ matches, loading }: { matches: Match[], loading: boolean 
 
   return (
     <div className="w-screen h-screen bg-black overflow-hidden">
-      {streamUrl && (streamUrl.includes('.m3u8') || streamUrl.includes('proxy?url=')) ? (
+      {streamUrl && (streamUrl.includes('.m3u8') || streamUrl.includes('/api/proxy')) ? (
         <ClapprProxyPlayer streamUrl={streamUrl} />
       ) : (
         <iframe
