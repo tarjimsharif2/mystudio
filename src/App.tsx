@@ -39,6 +39,12 @@ const generateSlug = (text: string) => {
 };
 
 const getMatchSlug = (match: Match) => {
+  if (match.link) {
+    const slugMatch = match.link.match(/\/matches\/([^/]+)/);
+    if (slugMatch && slugMatch[1]) {
+      return slugMatch[1].replace('-okkoora-com', '');
+    }
+  }
   if (match.team1 && match.team2) {
     return generateSlug(`${match.team1} vs ${match.team2}`);
   }
