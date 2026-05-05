@@ -25,7 +25,7 @@ app.get("/api/matches", async (req, res) => {
 
   try {
     const response = await axios.get("https://www.okkoora.com", {
-      timeout: 4000,
+      timeout: 2500,
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
         "Accept-Language": "en-US,en;q=0.9,ar;q=0.8",
@@ -84,13 +84,20 @@ app.get("/api/matches", async (req, res) => {
     if (textsToTranslate.length > 0) {
       try {
         let timeoutId: any;
+        let isRaceFinished = false;
         const timeoutPromise = new Promise((_, reject) => {
-          timeoutId = setTimeout(() => reject(new Error("Translation timed out")), 4000);
+          timeoutId = setTimeout(() => reject(new Error("Translation timed out")), 2500);
+        });
+        const translateTask = translate(textsToTranslate, { to: 'en' }).catch(err => {
+          console.error("Translate background error:", err.message);
+          if (isRaceFinished) return null;
+          throw err;
         });
         const translatedArray: any = await Promise.race([
-          translate(textsToTranslate, { to: 'en' }),
+          translateTask,
           timeoutPromise
         ]);
+        isRaceFinished = true;
         clearTimeout(timeoutId);
         let tIndex = 0;
         
@@ -220,7 +227,7 @@ async function extractStreamFromPlayer(url: string, referer: string, depth = 0):
   
   try {
     const playerRes = await axios.get(url, {
-      timeout: 10000,
+      timeout: 4000,
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
         "Referer": referer,
@@ -369,7 +376,7 @@ app.get("/api/match-stream", async (req, res) => {
       };
       
       const response = await axios.get(url, {
-        timeout: 10000,
+        timeout: 4000,
         headers: mainPageHeaders,
       });
 

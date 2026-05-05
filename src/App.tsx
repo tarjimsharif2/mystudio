@@ -552,7 +552,13 @@ function MainApp() {
       const res = await fetch("/api/matches");
       if (!res.ok) {
          let errorText = await res.text();
-         throw new Error(`Server returned ${res.status}: ${errorText}`);
+         try {
+            const errJson = JSON.parse(errorText);
+            throw new Error(errJson.error || `Server returned ${res.status}`);
+         } catch(e) {
+            if (e.message.startsWith("Server returned")) throw e;
+            throw new Error(`Server returned ${res.status}: ${errorText.substring(0, 100)}`);
+         }
       }
       const data = await res.json();
       if (data.success) {
