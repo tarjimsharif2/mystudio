@@ -133,14 +133,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const slug = getMatchSlug(m);
         const servers = await getMatchStreams(m.link);
         
-        let playerUrl: any = `${baseUrl}/match/${slug}`;
         if (servers.length > 0) {
-           playerUrl = servers.map(s => `${baseUrl}/match/${slug}/${generateSlug(s)}`);
-        } else {
-           playerUrl = [playerUrl]; // Wrap in array as requested
+           return servers.map(s => {
+               const serverSlug = generateSlug(s);
+               return {
+                   id: `${slug}-${serverSlug}`,
+                   name: `${m.title} - ${s}`,
+                   league: m.category,
+                   time: m.time,
+                   status: m.status,
+                   image: m.logo1 || m.logo2 || "https://icons.iconarchive.com/icons/custom-icon-design/flatastic-10/512/Sport-football-icon.png",
+                   matchUrl: m.link,
+                   playerUrl: `${baseUrl}/match/${slug}/${serverSlug}`,
+                   streamUrl: `${baseUrl}/api/proxy?url=` 
+               };
+           });
         }
 
-        return {
+        return [{
            id: slug,
            name: m.title,
            league: m.category,
@@ -148,13 +158,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
            status: m.status,
            image: m.logo1 || m.logo2 || "https://icons.iconarchive.com/icons/custom-icon-design/flatastic-10/512/Sport-football-icon.png",
            matchUrl: m.link,
-           playerUrl,
-           streamUrl: `${baseUrl}/api/proxy?url=` // Placeholder as the frontend handles stream resolution
-        };
+           playerUrl: `${baseUrl}/match/${slug}`,
+           streamUrl: `${baseUrl}/api/proxy?url=` 
+        }];
     });
 
-    const matchesResult = await Promise.all(fetchPromises);
+    const matchesResult = (await Promise.all(fetchPromises)).flat();
 
+    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=120');
     return res.status(200).json({
       updatedAt: new Date().toISOString(),
       count: matchesResult.length,
